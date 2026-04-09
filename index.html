@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resume Builder — ATS Optimized</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; color: #1a1a1a; }
+.app { display: grid; grid-template-columns: 390px 1fr; min-height: 100vh; }
+.sidebar { background: #fff; border-right: 1px solid #e2e8f0; padding: 1rem; overflow-y: auto; height: 100vh; position: sticky; top: 0; }
+.profile-bar { display: flex; gap: 5px; align-items: center; margin-bottom: 0.85rem; padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; }
+.profile-bar select { flex: 1; font-size: 12px; padding: 5px 7px; border: 1px solid #e2e8f0; border-radius: 6px; background: #f8fafc; color: #1a1a1a; font-family: inherit; cursor: pointer; }
+.profile-bar select:focus { outline: none; border-color: #1a3a5c; }
+.btn-profile { font-size: 11px; padding: 4px 8px; border: 1px solid #cbd5e0; border-radius: 5px; background: #f8fafc; color: #444; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+.btn-profile:hover { background: #eef2f7; border-color: #1a3a5c; color: #1a3a5c; }
+.btn-profile.danger { border-color: #fed7d7; background: #fff5f5; color: #e53e3e; }
+.btn-profile.danger:hover { background: #fed7d7; }
+.sidebar-header { display: flex; align-items: center; gap: 8px; margin-bottom: 1rem; }
+.sidebar-title { font-size: 14px; font-weight: 700; color: #1a3a5c; }
+.ats-badge { font-size: 9px; background: #e6f4ea; color: #276749; border: 1px solid #b7dfbf; border-radius: 10px; padding: 2px 8px; font-weight: 600; }
+.save-indicator { font-size: 9px; color: #a0aec0; margin-left: auto; transition: color 0.3s; }
+.save-indicator.saved { color: #276749; }
+.tab-bar { display: flex; gap: 4px; margin-bottom: 1rem; flex-wrap: wrap; }
+.tab { font-size: 11px; padding: 4px 10px; border: 1px solid #cbd5e0; border-radius: 20px; background: transparent; color: #555; cursor: pointer; transition: all 0.15s; }
+.tab.active { background: #1a3a5c; color: white; border-color: #1a3a5c; }
+.section-label { font-size: 10px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin: 1rem 0 0.5rem; }
+.field { margin-bottom: 8px; }
+.field label { font-size: 11px; color: #555; display: block; margin-bottom: 3px; font-weight: 500; }
+.hint { font-size: 10px; color: #a0aec0; margin-bottom: 6px; font-style: italic; }
+input, textarea, select.field-select { width: 100%; font-size: 12px; padding: 7px 10px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #1a1a1a; font-family: inherit; resize: vertical; transition: border 0.15s; }
+input:focus, textarea:focus { outline: none; border-color: #1a3a5c; box-shadow: 0 0 0 3px rgba(26,58,92,0.08); }
+textarea { min-height: 64px; }
+.exp-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+.exp-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.exp-card-label { font-size: 11px; font-weight: 700; color: #1a3a5c; }
+.btn-remove { font-size: 10px; padding: 3px 9px; border: 1px solid #fed7d7; border-radius: 5px; background: #fff5f5; color: #e53e3e; cursor: pointer; font-weight: 500; }
+.btn-add { width: 100%; font-size: 12px; padding: 8px; border: 1px dashed #cbd5e0; border-radius: 6px; background: transparent; color: #666; cursor: pointer; margin-top: 6px; transition: all 0.15s; }
+.btn-add:hover { background: #f0f4f8; border-color: #1a3a5c; color: #1a3a5c; }
+.btn-export { width: 100%; padding: 11px; background: #1a3a5c; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 1rem; letter-spacing: 0.02em; }
+.btn-export:hover { background: #0f2640; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.ats-tip { background: #fffbeb; border: 1px solid #f6e05e; border-radius: 6px; padding: 8px 10px; font-size: 10.5px; color: #744210; margin-bottom: 12px; line-height: 1.5; }
+.preview { padding: 2rem; overflow-y: auto; }
+.preview-toolbar { max-width: 760px; margin: 0 auto 1rem; display: flex; align-items: center; justify-content: space-between; }
+.preview-label { font-size: 11px; color: #888; font-weight: 500; }
+.ats-info { font-size: 11px; color: #276749; font-weight: 600; background: #e6f4ea; padding: 3px 10px; border-radius: 10px; border: 1px solid #b7dfbf; }
+.resume-wrap { max-width: 760px; margin: 0 auto; }
+/* ATS Scanner styles */
+.jd-area { width: 100%; font-size: 12px; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; min-height: 120px; resize: vertical; font-family: inherit; }
+.jd-area:focus { outline: none; border-color: #1a3a5c; }
+.btn-scan { width: 100%; padding: 9px; background: #276749; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+.btn-scan:hover { background: #1a4d34; }
+#ats-results { margin-top: 12px; }
+.ats-score { font-size: 22px; font-weight: 700; text-align: center; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+.score-good { background: #e6f4ea; color: #276749; }
+.score-ok { background: #fffbeb; color: #744210; }
+.score-low { background: #fff5f5; color: #c53030; }
+.kw-section { margin-bottom: 10px; }
+.kw-label { font-size: 10px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+.kw-chip { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin: 2px; }
+.kw-found { background: #e6f4ea; color: #276749; border: 1px solid #b7dfbf; }
+.kw-missing { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; }
+/* Resume doc */
+#resume-doc { background: white; padding: 44px 52px; border: 1px solid #dde3ec; border-radius: 4px; font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.6; color: #000; }
+.r-name { font-size: 22px; font-weight: 700; color: #000; margin-bottom: 2px; }
+.r-target-title { font-size: 13px; color: #1a3a5c; font-weight: 700; margin-bottom: 6px; }
+.r-contact-row { font-size: 10.5px; color: #333; margin-bottom: 10px; }
+.r-divider { border: none; border-top: 2px solid #1a3a5c; margin: 10px 0 14px; }
+.r-section { margin-bottom: 16px; }
+.r-section-title { font-size: 11px; font-weight: 700; color: #000; text-transform: uppercase; letter-spacing: 0.1em; background: #eef2f7; padding: 4px 8px; margin-bottom: 10px; border-left: 3px solid #1a3a5c; }
+.r-summary { font-size: 11px; color: #111; line-height: 1.65; }
+.r-job { margin-bottom: 13px; }
+.r-job-header { display: flex; justify-content: space-between; align-items: baseline; }
+.r-job-title { font-size: 11.5px; font-weight: 700; color: #000; }
+.r-job-date { font-size: 10.5px; color: #333; font-weight: 600; white-space: nowrap; margin-left: 8px; }
+.r-company { font-size: 11px; color: #1a3a5c; font-weight: 700; margin-bottom: 4px; }
+.r-bullets { padding-left: 16px; margin-top: 4px; }
+.r-bullets li { font-size: 10.5px; color: #111; margin-bottom: 3px; line-height: 1.55; }
+.r-certs-list { columns: 2; column-gap: 20px; padding-left: 16px; }
+.r-certs-list li { font-size: 10px; color: #111; margin-bottom: 3px; break-inside: avoid; }
+.r-skills-block { font-size: 10.5px; color: #111; line-height: 1.85; }
+.r-skills-block strong { color: #000; font-weight: 700; }
+.r-edu-title { font-size: 11.5px; font-weight: 700; color: #000; }
+.r-edu-school { font-size: 11px; color: #1a3a5c; font-weight: 700; }
+.r-edu-year { font-size: 10.5px; color: #333; }
+@media print {
+  html, body { margin: 0 !important; padding: 0 !important; background: white !important; }
+  .app { display: block !important; }
+  .sidebar, .preview-toolbar { display: none !important; }
+  .preview { padding: 0 !important; background: white !important; }
+  .resume-wrap { max-width: 100% !important; }
+  #resume-doc { border: none !important; border-radius: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; font-size: 10.5px !important; }
+  @page { size: letter; margin: 0.5in 0.6in; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <!-- Profile bar -->
+    <div class="profile-bar">
+      <select id="profile-select" onchange="switchProfile(this.value)" title="Active profile"></select>
+      <button class="btn-profile" onclick="newProfile()" title="New profile">+ New</button>
+      <button class="btn-profile" onclick="renameProfile()" title="Rename profile">Rename</button>
+      <button class="btn-profile danger" onclick="deleteProfile()" title="Delete profile">Del</button>
+    </div>
+
+    <div class="sidebar-header">
+      <div class="sidebar-title">Resume Builder</div>
+      <span class="ats-badge">ATS Optimized</span>
+      <span class="save-indicator" id="save-indicator">saved</span>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab active" onclick="showTab('basics')">Basics</button>
+      <button class="tab" onclick="showTab('experience')">Experience</button>
+      <button class="tab" onclick="showTab('skills')">Skills</button>
+      <button class="tab" onclick="showTab('certs')">Certifications</button>
+      <button class="tab" onclick="showTab('atsscan')">ATS Scan</button>
+    </div>
+
+    <div id="tab-basics" class="tab-panel active">
+      <div class="ats-tip">ATS tip: Your job title should match the posting exactly. Keywords in the summary are scanned first by ATS systems.</div>
+      <div class="section-label">Personal info</div>
+      <div class="field"><label>Full name</label><input id="f-name" oninput="render();scheduleS()"></div>
+      <div class="field"><label>Target job title (change per application!)</label><input id="f-title" oninput="render();scheduleS()"></div>
+      <div class="field"><label>Location</label><input id="f-loc" oninput="render();scheduleS()"></div>
+      <div class="field"><label>Phone</label><input id="f-phone" oninput="render();scheduleS()"></div>
+      <div class="field"><label>Email</label><input id="f-email" oninput="render();scheduleS()"></div>
+      <div class="field"><label>LinkedIn</label><input id="f-li" oninput="render();scheduleS()"></div>
+      <div class="section-label">Professional summary</div>
+      <div class="hint">Paste keywords from the job description into this section. ATS scans this heavily.</div>
+      <div class="field"><textarea id="f-summary" oninput="render();scheduleS()" rows="9"></textarea></div>
+      <div class="section-label">Education</div>
+      <div class="field"><label>Degree</label><input id="f-edu-deg" oninput="render();scheduleS()"></div>
+      <div class="field"><label>University</label><input id="f-edu-school" oninput="render();scheduleS()"></div>
+      <div class="field"><label>Years</label><input id="f-edu-year" oninput="render();scheduleS()"></div>
+    </div>
+
+    <div id="tab-experience" class="tab-panel">
+      <div class="ats-tip">ATS tip: Start every bullet with a strong action verb. Include numbers — percentages, team sizes, timelines. ATS scores higher for quantified achievements.</div>
+      <div id="exp-list"></div>
+      <button class="btn-add" onclick="addExp()">+ Add position</button>
+    </div>
+
+    <div id="tab-skills" class="tab-panel">
+      <div class="ats-tip">ATS tip: Mirror exact keywords from job postings. If the JD says "MuleSoft Integration" — use those exact words here.</div>
+      <div class="section-label">Skill groups (comma separated)</div>
+      <div class="field"><label>Architecture and Strategy</label><textarea id="f-s1" oninput="render();scheduleS()" rows="2"></textarea></div>
+      <div class="field"><label>Salesforce Clouds and Products</label><textarea id="f-s2" oninput="render();scheduleS()" rows="2"></textarea></div>
+      <div class="field"><label>Integration and Middleware</label><textarea id="f-s3" oninput="render();scheduleS()" rows="2"></textarea></div>
+      <div class="field"><label>DevOps and Deployment</label><textarea id="f-s4" oninput="render();scheduleS()" rows="2"></textarea></div>
+      <div class="field"><label>Methodologies and Compliance</label><textarea id="f-s5" oninput="render();scheduleS()" rows="2"></textarea></div>
+    </div>
+
+    <div id="tab-certs" class="tab-panel">
+      <div class="ats-tip">ATS tip: Use exact official certification names as Salesforce lists them. These are strong keyword matches.</div>
+      <div class="section-label">One certification per line</div>
+      <textarea id="f-certs" oninput="render();scheduleS()" rows="32"></textarea>
+    </div>
+
+    <div id="tab-atsscan" class="tab-panel">
+      <div class="ats-tip">Paste a job description below and click Scan Now to see which keywords your resume is missing.</div>
+      <div class="section-label">Job description</div>
+      <textarea id="f-jd" class="jd-area" placeholder="Paste the full job description here..."></textarea>
+      <button class="btn-scan" onclick="runATSScan()">Scan Now</button>
+      <div id="ats-results"></div>
+    </div>
+
+    <button class="btn-export" onclick="exportPDF()">Print / Save as PDF</button>
+  </div>
+
+  <div class="preview">
+    <div class="preview-toolbar">
+      <span class="preview-label">Live preview — edits update instantly</span>
+      <span class="ats-info">ATS Compatibility: High</span>
+    </div>
+    <div class="resume-wrap">
+      <div id="resume-doc"></div>
+    </div>
+  </div>
+</div>
+<script>
+// ── DEFAULT DATA ──────────────────────────────────────────────────────────────
+const DEFAULTS = {
+  name: 'Subham Mohapatra',
+  title: 'Salesforce Solution Architect',
+  loc: 'California, USA | Open to Remote',
+  phone: '916-495-7975',
+  email: 'sunu.1992.subham@gmail.com',
+  li: 'linkedin.com/in/subham-mohapatra',
+  summary: 'Salesforce Certified Application Architect and System Architect with 11+ years of experience delivering enterprise-grade, cross-cloud Salesforce solutions across public sector and private industries. Deep expertise in solution architecture, stakeholder management, release governance, and platform strategy using Sales Cloud, Service Cloud, Experience Cloud, Public Sector Cloud, OmniStudio, MuleSoft, and Heroku. Proven track record managing multi-million-dollar government technology engagements with California state agencies including the Department of Industrial Relations, California Energy Commission, California Public Utilities Commission, California Department of Insurance, and CalHR. Expert at translating complex business requirements into scalable, low-code platform strategies aligned to the Salesforce Well-Architected Framework. Holder of 30+ Salesforce, DevOps, and integration certifications. Open to remote roles nationwide.',
+  eduDeg: 'Bachelor of Engineering, Electronics and Communication Engineering',
+  eduSchool: 'Biju Patnaik University of Technology',
+  eduYear: '2009 – 2013',
+  s1: 'Solution Architecture, Cross-Cloud Architecture, Enterprise Governance, Salesforce Well-Architected Framework, Pre-Sales Architecture, Technical Advisory, Stakeholder Management, Release Management',
+  s2: 'Sales Cloud, Service Cloud, Experience Cloud, Public Sector Cloud, OmniStudio, Vlocity, Marketing Cloud, Financial Services Cloud, Flow Builder, Entitlements, Apex, Lightning Web Components',
+  s3: 'MuleSoft, Heroku Connect, REST APIs, SOAP APIs, Real-time Data Integration, Third-Party System Integration',
+  s4: 'Copado, AutoRABIT, Flosum, Gearset, Bitbucket, CI/CD Pipelines, Change Management, Incident Management',
+  s5: 'Agile, SAFe, IT Security Compliance, SLA Management, Workato, Conga Composer, Slack Administration',
+  certs: `Salesforce Certified Application Architect
+Salesforce Certified System Architect
+Salesforce Certified Integration Architect
+Salesforce Certified Data Architect
+Salesforce Certified Development Lifecycle and Deployment Architect
+Salesforce Certified Identity and Access Management Designer
+Salesforce Certified Sharing and Visibility Designer
+Salesforce Certified Platform Developer I
+Salesforce Certified Administrator
+Salesforce Certified Advanced Administrator
+Salesforce Certified Service Cloud Consultant
+Salesforce Certified Community Cloud Consultant
+Salesforce Certified Platform App Builder
+Salesforce Certified OmniStudio Developer
+Salesforce Certified AI Associate
+Salesforce Certified AI Specialist
+Salesforce Certified Marketing Cloud Administrator
+Salesforce Certified MuleSoft Developer I
+Copado Certified DevOps Administrator
+Copado Certified Developer
+Flosum Certified Professional
+Flosum Certified Expert
+Workato Automation Pro I
+Workato Automation Pro II
+Workato Automation Pro III
+Salesforce DevOps Leadership Certificate
+Public Sector Solutions Accredited Professional
+Financial Services Cloud Accredited Professional
+Slack Certified Admin
+Certified Agile SAFe Practitioner`,
+  expData: [
+    {
+      title: 'Salesforce Architect',
+      company: 'Global Touchpoints Inc. | California, USA (Remote)',
+      date: 'January 2022 – Present',
+      bullets: [
+        'Architected and delivered enterprise Salesforce solutions across Sales Cloud, Service Cloud, Experience Cloud, and Public Sector Cloud for 7+ California state agencies including the Department of Industrial Relations, California Energy Commission, California Public Utilities Commission, California Department of Insurance, and CalHR',
+        'Led full release management lifecycle end-to-end from requirements and planning through deployment and escalation management, achieving zero critical production failures across 3+ years of continuous delivery',
+        'Designed Heroku-hosted citizen-facing portal with real-time bidirectional Salesforce sync via Heroku Connect, reducing data latency by 60% and improving experience for 100,000+ end users',
+        'Integrated Salesforce with 5+ enterprise third-party systems using MuleSoft REST and SOAP APIs, enabling seamless real-time data flow and eliminating manual data re-entry across client operations',
+        'Delivered OmniStudio and Flow Builder implementations that eliminated 15+ hours per week of manual processing, improving operational efficiency by 40% across multiple agency clients',
+        'Served as trusted technical advisor and mentor for cross-functional teams of 10+ developers, reducing code review cycle time by 35% through architecture coaching and governance standards',
+        'Maintained 100% IT security and data protection compliance across all client environments aligned to ITM guidelines, with zero audit findings over entire engagement',
+        'Managed executive stakeholder relationships and SLAs across 7+ concurrent state agency engagements, maintaining 98%+ client satisfaction scores'
+      ]
+    },
+    {
+      title: 'Salesforce Technical Leader',
+      company: 'Carelon Global Solutions | USA, India, Ireland (Hybrid)',
+      date: 'June 2019 – January 2022',
+      bullets: [
+        'Directed Salesforce solution architecture for a cross-functional multinational team of 20+ across USA, India, and Ireland, delivering complex healthcare Salesforce solutions aligned to strict regulatory and business SLAs',
+        'Architected real-time insurance quote integration using Heroku Connect, providing brokers instant access to accurate pricing data across multiple platforms and eliminating a 2-hour manual data retrieval process',
+        'Reduced Salesforce org production exceptions by 70% by diagnosing and resolving governor limit violations and refactoring legacy implementations, significantly improving system reliability',
+        'Engineered enterprise MuleSoft REST and SOAP API integration frameworks enabling interoperability across 8+ critical healthcare systems supporting over $50M in annual transactions',
+        'Standardized CI/CD deployment pipelines using Bitbucket and AutoRABIT, reducing average deployment time by 50% and eliminating manual release errors across all environments',
+        'Led Vlocity and OmniStudio implementation for complex insurance product workflows, reducing configuration time by 30% and enabling faster product go-to-market cycles'
+      ]
+    },
+    {
+      title: 'Salesforce Senior Consultant and Team Lead',
+      company: 'Positiveedge | Remote',
+      date: 'July 2016 – May 2019',
+      bullets: [
+        'Led end-to-end delivery of 10+ high-impact Salesforce projects as team lead, consistently delivering on time and on budget with measurable outcomes for each client',
+        'Built a custom CPQ Configure Price Quote portal on Heroku with real-time quoting for insurance brokers, reducing quote generation time from 2 hours to under 5 minutes and improving data accuracy by 90%',
+        'Managed deployments across Copado, Gearset, AutoRABIT, and Flosum, achieving error-free releases with zero post-deployment rollbacks across all project environments',
+        'Designed and delivered end-user training programs that increased Salesforce platform adoption by 35% within 60 days of go-live across client organizations',
+        'Acted as strategic architect designing scalable, future-proof Salesforce solutions that enabled long-term platform growth aligned to client business roadmaps'
+      ]
+    },
+    {
+      title: 'Salesforce Developer',
+      company: 'Indium Software | India',
+      date: 'November 2015 – July 2016',
+      bullets: [
+        'Developed and customized Salesforce applications using Apex, Aura components, and declarative tools to meet unique client business requirements and enhance platform functionality'
+      ]
+    },
+    {
+      title: 'Salesforce Administrator',
+      company: 'Webtek Services Pvt Ltd | India',
+      date: 'November 2013 – November 2015',
+      bullets: [
+        'Administered and optimized Salesforce org configuration, workflows, validation rules, reports, dashboards, and data integrity for enterprise client environments'
+      ]
+    }
+  ]
+};
+
+// ── EXPERIENCE DATA ───────────────────────────────────────────────────────────
+let expData = [];
+
+// ── PROFILE MANAGEMENT ────────────────────────────────────────────────────────
+let currentProfile = 'Default';
+
+function getProfiles() {
+  return JSON.parse(localStorage.getItem('resumeProfiles') || '["Default"]');
+}
+function setProfiles(list) {
+  localStorage.setItem('resumeProfiles', JSON.stringify(list));
+}
+
+function populateProfileSelect() {
+  const sel = document.getElementById('profile-select');
+  const profiles = getProfiles();
+  sel.innerHTML = profiles.map(p =>
+    `<option value="${p}" ${p === currentProfile ? 'selected' : ''}>${p}</option>`
+  ).join('');
+}
+
+function switchProfile(name) {
+  saveToStorage();
+  currentProfile = name;
+  localStorage.setItem('resumeCurrentProfile', name);
+  loadFromStorage();
+  render();
+  const activeTab = document.querySelector('.tab-panel.active');
+  if (activeTab && activeTab.id === 'tab-experience') renderExpList();
+}
+
+function newProfile() {
+  const name = prompt('Profile name (e.g. "Gov Focus", "Startup Role"):', '');
+  if (!name || !name.trim()) return;
+  const trimmed = name.trim();
+  const profiles = getProfiles();
+  if (profiles.includes(trimmed)) { alert('A profile with that name already exists.'); return; }
+  saveToStorage();
+  profiles.push(trimmed);
+  setProfiles(profiles);
+  currentProfile = trimmed;
+  localStorage.setItem('resumeCurrentProfile', trimmed);
+  loadDefaults();
+  saveToStorage();
+  populateProfileSelect();
+  render();
+}
+
+function renameProfile() {
+  const newName = prompt('New name for "' + currentProfile + '":', currentProfile);
+  if (!newName || !newName.trim() || newName.trim() === currentProfile) return;
+  const trimmed = newName.trim();
+  const data = localStorage.getItem('resumeData_' + currentProfile);
+  if (data) {
+    localStorage.setItem('resumeData_' + trimmed, data);
+    localStorage.removeItem('resumeData_' + currentProfile);
+  }
+  const profiles = getProfiles().map(p => p === currentProfile ? trimmed : p);
+  setProfiles(profiles);
+  currentProfile = trimmed;
+  localStorage.setItem('resumeCurrentProfile', trimmed);
+  populateProfileSelect();
+}
+
+function deleteProfile() {
+  const profiles = getProfiles();
+  if (profiles.length === 1) { alert('Cannot delete the only profile.'); return; }
+  if (!confirm('Delete profile "' + currentProfile + '"? This cannot be undone.')) return;
+  localStorage.removeItem('resumeData_' + currentProfile);
+  const newList = profiles.filter(p => p !== currentProfile);
+  setProfiles(newList);
+  currentProfile = newList[0];
+  localStorage.setItem('resumeCurrentProfile', currentProfile);
+  populateProfileSelect();
+  loadFromStorage();
+  render();
+}
+
+// ── LOCAL STORAGE ─────────────────────────────────────────────────────────────
+let saveTimer = null;
+
+function scheduleS() {
+  const ind = document.getElementById('save-indicator');
+  ind.textContent = 'saving…';
+  ind.className = 'save-indicator';
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveToStorage();
+    ind.textContent = 'saved';
+    ind.className = 'save-indicator saved';
+  }, 400);
+}
+
+function saveToStorage() {
+  const data = {
+    name: val('f-name'), title: val('f-title'), loc: val('f-loc'),
+    phone: val('f-phone'), email: val('f-email'), li: val('f-li'),
+    summary: val('f-summary'), eduDeg: val('f-edu-deg'),
+    eduSchool: val('f-edu-school'), eduYear: val('f-edu-year'),
+    s1: val('f-s1'), s2: val('f-s2'), s3: val('f-s3'), s4: val('f-s4'), s5: val('f-s5'),
+    certs: val('f-certs'),
+    expData: JSON.stringify(expData)
+  };
+  localStorage.setItem('resumeData_' + currentProfile, JSON.stringify(data));
+}
+
+function loadFromStorage() {
+  const saved = localStorage.getItem('resumeData_' + currentProfile);
+  if (saved) {
+    try {
+      const d = JSON.parse(saved);
+      setF('f-name', d.name); setF('f-title', d.title); setF('f-loc', d.loc);
+      setF('f-phone', d.phone); setF('f-email', d.email); setF('f-li', d.li);
+      setF('f-summary', d.summary); setF('f-edu-deg', d.eduDeg);
+      setF('f-edu-school', d.eduSchool); setF('f-edu-year', d.eduYear);
+      setF('f-s1', d.s1); setF('f-s2', d.s2); setF('f-s3', d.s3);
+      setF('f-s4', d.s4); setF('f-s5', d.s5); setF('f-certs', d.certs);
+      expData.length = 0;
+      JSON.parse(d.expData || '[]').forEach(e => expData.push(e));
+    } catch(e) { loadDefaults(); }
+  } else {
+    loadDefaults();
+  }
+}
+
+function loadDefaults() {
+  setF('f-name', DEFAULTS.name); setF('f-title', DEFAULTS.title); setF('f-loc', DEFAULTS.loc);
+  setF('f-phone', DEFAULTS.phone); setF('f-email', DEFAULTS.email); setF('f-li', DEFAULTS.li);
+  setF('f-summary', DEFAULTS.summary); setF('f-edu-deg', DEFAULTS.eduDeg);
+  setF('f-edu-school', DEFAULTS.eduSchool); setF('f-edu-year', DEFAULTS.eduYear);
+  setF('f-s1', DEFAULTS.s1); setF('f-s2', DEFAULTS.s2); setF('f-s3', DEFAULTS.s3);
+  setF('f-s4', DEFAULTS.s4); setF('f-s5', DEFAULTS.s5); setF('f-certs', DEFAULTS.certs);
+  expData.length = 0;
+  DEFAULTS.expData.forEach(e => expData.push(JSON.parse(JSON.stringify(e))));
+}
+
+function setF(id, v) { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.value = v; }
+function val(id) { return document.getElementById(id)?.value || ''; }
+
+// ── ATS SCANNER ───────────────────────────────────────────────────────────────
+const STOP = new Set(['the','and','or','a','an','of','in','to','for','with','on','at','by','from','as','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','shall','can','that','this','these','those','it','its','we','our','you','your','they','their','he','she','his','her','who','which','what','when','where','how','all','any','each','every','both','few','more','most','other','some','such','no','nor','not','only','own','same','so','than','too','very','just','but','also','about','above','after','before','between','into','through','during','including','without','within','along','following','across','behind','beyond','plus','except','up','out','around','if','then','than','about','over','under','its','their','we','i','me','my','us','am','re','ve']);
+
+function runATSScan() {
+  const jd = document.getElementById('f-jd').value.trim();
+  if (!jd) { alert('Paste a job description first.'); return; }
+
+  const resumeBlob = [
+    val('f-name'), val('f-title'), val('f-summary'),
+    val('f-s1'), val('f-s2'), val('f-s3'), val('f-s4'), val('f-s5'),
+    val('f-certs'),
+    ...expData.map(e => [e.title, e.company, ...e.bullets].join(' '))
+  ].join(' ').toLowerCase();
+
+  const tokens = jd.toLowerCase()
+    .replace(/[^a-z0-9\s\+\#\.\/]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !STOP.has(w));
+
+  const unique = [...new Set(tokens)];
+
+  const matched = [], missing = [];
+  unique.forEach(w => {
+    (resumeBlob.includes(w) ? matched : missing).push(w);
+  });
+
+  const score = Math.round((matched.length / Math.max(unique.length, 1)) * 100);
+  const cls = score >= 70 ? 'score-good' : score >= 50 ? 'score-ok' : 'score-low';
+  const chip = (w, c) => `<span class="kw-chip ${c}">${w}</span>`;
+
+  document.getElementById('ats-results').innerHTML = `
+    <div class="ats-score ${cls}"><strong>${score}%</strong> keyword match &nbsp;(${matched.length} of ${unique.length} keywords found)</div>
+    <div class="kw-section">
+      <div class="kw-label">Found in your resume (${matched.length})</div>
+      <div>${matched.slice(0, 80).map(w => chip(w, 'kw-found')).join('')}</div>
+    </div>
+    <div class="kw-section">
+      <div class="kw-label">Missing — consider adding these (${missing.length})</div>
+      <div>${missing.slice(0, 80).map(w => chip(w, 'kw-missing')).join('')}</div>
+    </div>
+  `;
+}
+
+// ── TAB MANAGEMENT ────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const tabs = ['basics', 'experience', 'skills', 'certs', 'atsscan'];
+  document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('active');
+  if (name === 'experience') renderExpList();
+}
+
+// ── EXPERIENCE LIST ───────────────────────────────────────────────────────────
+function renderExpList() {
+  document.getElementById('exp-list').innerHTML = expData.map((e, i) => `
+    <div class="exp-card">
+      <div class="exp-card-header">
+        <span class="exp-card-label">${e.title}</span>
+        <button class="btn-remove" onclick="removeExp(${i})">Remove</button>
+      </div>
+      <div class="field"><label>Job title</label><input value="${e.title.replace(/"/g,'&quot;')}" oninput="expData[${i}].title=this.value;render();scheduleS()"></div>
+      <div class="field"><label>Company and location</label><input value="${e.company.replace(/"/g,'&quot;')}" oninput="expData[${i}].company=this.value;render();scheduleS()"></div>
+      <div class="field"><label>Dates</label><input value="${e.date.replace(/"/g,'&quot;')}" oninput="expData[${i}].date=this.value;render();scheduleS()"></div>
+      <div class="field"><label>Bullets — one per line, start with action verb + metric</label>
+        <textarea rows="7" oninput="expData[${i}].bullets=this.value.split('\n').filter(b=>b.trim());render();scheduleS()">${e.bullets.join('\n')}</textarea>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addExp() {
+  expData.unshift({ title: 'New Role', company: 'Company Name | City, State', date: 'Month YYYY – Month YYYY', bullets: ['Action verb + what you did + measurable result'] });
+  renderExpList(); render(); scheduleS();
+}
+
+function removeExp(i) {
+  if (confirm('Remove this position?')) { expData.splice(i, 1); renderExpList(); render(); scheduleS(); }
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function getList(id, sep = ',') {
+  return (document.getElementById(id)?.value || '').split(sep).map(s => s.trim()).filter(Boolean);
+}
+
+function render() {
+  const certs = getList('f-certs', '\n');
+  const s1 = getList('f-s1'), s2 = getList('f-s2'), s3 = getList('f-s3');
+  const s4 = getList('f-s4'), s5 = getList('f-s5');
+
+  const expHTML = expData.map(e => `
+    <div class="r-job">
+      <div class="r-job-header">
+        <span class="r-job-title">${e.title}</span>
+        <span class="r-job-date">${e.date}</span>
+      </div>
+      <div class="r-company">${e.company}</div>
+      <ul class="r-bullets">${e.bullets.map(b => `<li>${b}</li>`).join('')}</ul>
+    </div>
+  `).join('');
+
+  document.getElementById('resume-doc').innerHTML = `
+    <div class="r-name">${val('f-name')}</div>
+    <div class="r-target-title">${val('f-title')}</div>
+    <div class="r-contact-row">${val('f-loc')} &nbsp;|&nbsp; ${val('f-phone')} &nbsp;|&nbsp; ${val('f-email')} &nbsp;|&nbsp; ${val('f-li')}</div>
+    <hr class="r-divider">
+    <div class="r-section">
+      <div class="r-section-title">Professional Summary</div>
+      <div class="r-summary">${val('f-summary')}</div>
+    </div>
+    <div class="r-section">
+      <div class="r-section-title">Professional Experience</div>
+      ${expHTML}
+    </div>
+    <div class="r-section">
+      <div class="r-section-title">Core Competencies and Technical Skills</div>
+      <div class="r-skills-block">
+        <strong>Architecture and Strategy:</strong> ${s1.join(', ')}<br>
+        <strong>Salesforce Clouds and Products:</strong> ${s2.join(', ')}<br>
+        <strong>Integration and Middleware:</strong> ${s3.join(', ')}<br>
+        <strong>DevOps and Deployment:</strong> ${s4.join(', ')}<br>
+        <strong>Methodologies and Compliance:</strong> ${s5.join(', ')}
+      </div>
+    </div>
+    <div class="r-section">
+      <div class="r-section-title">Certifications and Accreditations — ${certs.length} Total</div>
+      <ul class="r-certs-list">${certs.map(c => `<li>${c}</li>`).join('')}</ul>
+    </div>
+    <div class="r-section">
+      <div class="r-section-title">Education</div>
+      <div class="r-job-header">
+        <div>
+          <div class="r-edu-title">${val('f-edu-deg')}</div>
+          <div class="r-edu-school">${val('f-edu-school')}</div>
+        </div>
+        <div class="r-edu-year">${val('f-edu-year')}</div>
+      </div>
+    </div>
+  `;
+}
+
+// ── EXPORT PDF ────────────────────────────────────────────────────────────────
+function exportPDF() {
+  const name = val('f-name');
+  const year = new Date().getFullYear();
+  const safeName = name.replace(/\s+/g, '_');
+  const content = document.getElementById('resume-doc').innerHTML;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${safeName}_Resume_${year}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: white; color: #000; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.6; color: #000; }
+.r-name { font-size: 22px; font-weight: 700; color: #000; margin-bottom: 2px; }
+.r-target-title { font-size: 13px; color: #1a3a5c; font-weight: 700; margin-bottom: 6px; }
+.r-contact-row { font-size: 10.5px; color: #333; margin-bottom: 10px; }
+.r-divider { border: none; border-top: 2px solid #1a3a5c; margin: 10px 0 14px; }
+.r-section { margin-bottom: 14px; }
+.r-section-title { font-size: 11px; font-weight: 700; color: #000; text-transform: uppercase; letter-spacing: 0.1em; background: #eef2f7; padding: 4px 8px; margin-bottom: 8px; border-left: 3px solid #1a3a5c; }
+.r-summary { font-size: 11px; color: #111; line-height: 1.65; }
+.r-job { margin-bottom: 12px; }
+.r-job-header { display: flex; justify-content: space-between; align-items: baseline; }
+.r-job-title { font-size: 11.5px; font-weight: 700; color: #000; }
+.r-job-date { font-size: 10.5px; color: #333; font-weight: 600; white-space: nowrap; margin-left: 8px; }
+.r-company { font-size: 11px; color: #1a3a5c; font-weight: 700; margin-bottom: 4px; }
+.r-bullets { padding-left: 16px; margin-top: 4px; }
+.r-bullets li { font-size: 10.5px; color: #111; margin-bottom: 3px; line-height: 1.55; }
+.r-certs-list { columns: 2; column-gap: 20px; padding-left: 16px; }
+.r-certs-list li { font-size: 10px; color: #111; margin-bottom: 3px; break-inside: avoid; }
+.r-skills-block { font-size: 10.5px; color: #111; line-height: 1.85; }
+.r-skills-block strong { font-weight: 700; }
+.r-edu-title { font-size: 11.5px; font-weight: 700; }
+.r-edu-school { font-size: 11px; color: #1a3a5c; font-weight: 700; }
+.r-edu-year { font-size: 10.5px; color: #333; }
+@page { size: letter; margin: 0.5in 0.6in; }
+@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+${content}
+<script>window.onload = function(){ window.print(); };<\/script>
+</body>
+</html>`);
+  win.document.close();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+currentProfile = localStorage.getItem('resumeCurrentProfile') || 'Default';
+populateProfileSelect();
+loadFromStorage();
+render();
+</script>
+</body>
+</html>
