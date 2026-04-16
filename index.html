@@ -21,6 +21,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .ats-badge { font-size: 9px; background: #e6f4ea; color: #276749; border: 1px solid #b7dfbf; border-radius: 10px; padding: 2px 8px; font-weight: 600; }
 .save-indicator { font-size: 9px; color: #a0aec0; margin-left: auto; transition: color 0.3s; }
 .save-indicator.saved { color: #276749; }
+.save-indicator.cloud { color: #2b6cb0; }
+.save-indicator.offline { color: #c05621; }
 .tab-bar { display: flex; gap: 4px; margin-bottom: 1rem; flex-wrap: wrap; }
 .tab { font-size: 11px; padding: 4px 10px; border: 1px solid #cbd5e0; border-radius: 20px; background: transparent; color: #555; cursor: pointer; transition: all 0.15s; }
 .tab.active { background: #1a3a5c; color: white; border-color: #1a3a5c; }
@@ -170,6 +172,7 @@ textarea { min-height: 64px; }
     </div>
 
     <button class="btn-export" onclick="exportPDF()">Print / Save as PDF</button>
+    <button class="btn-export" style="margin-top:6px;background:#4a5568;font-size:11px;padding:8px;" onclick="exportBackup()">Export Backup (.json)</button>
   </div>
 
   <div class="preview">
@@ -182,7 +185,23 @@ textarea { min-height: 64px; }
     </div>
   </div>
 </div>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyA5yn1_sF5O78nV0qBHlS5A3urjtlg-uxc",
+  authDomain: "resumebuilder-3cb04.firebaseapp.com",
+  projectId: "resumebuilder-3cb04",
+  storageBucket: "resumebuilder-3cb04.firebasestorage.app",
+  messagingSenderId: "61618369242",
+  appId: "1:61618369242:web:0f006bd8fc1aff82296be3"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
 // ── DEFAULT DATA ──────────────────────────────────────────────────────────────
 const DEFAULTS = {
   name: 'Subham Mohapatra',
@@ -311,11 +330,21 @@ function populateProfileSelect() {
   ).join('');
 }
 
-function switchProfile(name) {
-  saveToStorage();
+async function switchProfile(name) {
+  await saveToStorage();
   currentProfile = name;
   localStorage.setItem('resumeCurrentProfile', name);
-  loadFromStorage();
+  const user = auth.currentUser;
+  if (user) {
+    try {
+      const doc = await db.collection('resumes').doc(user.uid).collection('profiles').doc(name).get();
+      if (doc.exists) { populateFields(doc.data()); }
+      else { loadFromStorage(); }
+      await db.collection('resumes').doc(user.uid).collection('profiles').doc('__meta__').set({ profiles: getProfiles(), activeProfile: name });
+    } catch(e) { loadFromStorage(); }
+  } else {
+    loadFromStorage();
+  }
   render();
   const activeTab = document.querySelector('.tab-panel.active');
   if (activeTab && activeTab.id === 'tab-experience') renderExpList();
@@ -368,7 +397,7 @@ function deleteProfile() {
   render();
 }
 
-// ── LOCAL STORAGE ─────────────────────────────────────────────────────────────
+// ── STORAGE ───────────────────────────────────────────────────────────────────
 let saveTimer = null;
 
 function scheduleS() {
@@ -376,15 +405,11 @@ function scheduleS() {
   ind.textContent = 'saving…';
   ind.className = 'save-indicator';
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveToStorage();
-    ind.textContent = 'saved';
-    ind.className = 'save-indicator saved';
-  }, 400);
+  saveTimer = setTimeout(() => saveToStorage(), 400);
 }
 
-function saveToStorage() {
-  const data = {
+function buildDataSnapshot() {
+  return {
     name: val('f-name'), title: val('f-title'), loc: val('f-loc'),
     phone: val('f-phone'), email: val('f-email'), li: val('f-li'),
     summary: val('f-summary'), eduDeg: val('f-edu-deg'),
@@ -393,7 +418,29 @@ function saveToStorage() {
     certs: val('f-certs'),
     expData: JSON.stringify(expData)
   };
+}
+
+async function saveToStorage() {
+  const ind = document.getElementById('save-indicator');
+  const data = buildDataSnapshot();
+  // Always write localStorage as backup
   localStorage.setItem('resumeData_' + currentProfile, JSON.stringify(data));
+  const user = auth.currentUser;
+  if (user) {
+    try {
+      const ref = db.collection('resumes').doc(user.uid).collection('profiles');
+      await ref.doc(currentProfile).set(data);
+      await ref.doc('__meta__').set({ profiles: getProfiles(), activeProfile: currentProfile });
+      ind.textContent = 'saved ☁';
+      ind.className = 'save-indicator cloud';
+    } catch (e) {
+      ind.textContent = 'saved locally';
+      ind.className = 'save-indicator offline';
+    }
+  } else {
+    ind.textContent = 'saved';
+    ind.className = 'save-indicator saved';
+  }
 }
 
 function loadFromStorage() {
@@ -428,6 +475,57 @@ function loadDefaults() {
 
 function setF(id, v) { const el = document.getElementById(id); if (el && v !== undefined && v !== null) el.value = v; }
 function val(id) { return document.getElementById(id)?.value || ''; }
+
+function populateFields(d) {
+  setF('f-name', d.name); setF('f-title', d.title); setF('f-loc', d.loc);
+  setF('f-phone', d.phone); setF('f-email', d.email); setF('f-li', d.li);
+  setF('f-summary', d.summary); setF('f-edu-deg', d.eduDeg);
+  setF('f-edu-school', d.eduSchool); setF('f-edu-year', d.eduYear);
+  setF('f-s1', d.s1); setF('f-s2', d.s2); setF('f-s3', d.s3);
+  setF('f-s4', d.s4); setF('f-s5', d.s5); setF('f-certs', d.certs);
+  expData.length = 0;
+  JSON.parse(d.expData || '[]').forEach(e => expData.push(e));
+}
+
+async function loadFromCloud(uid) {
+  try {
+    const ref = db.collection('resumes').doc(uid).collection('profiles');
+    const metaDoc = await ref.doc('__meta__').get();
+    if (metaDoc.exists) {
+      const { profiles, activeProfile } = metaDoc.data();
+      setProfiles(profiles);
+      currentProfile = activeProfile || profiles[0];
+      localStorage.setItem('resumeCurrentProfile', currentProfile);
+    }
+    const profileDoc = await ref.doc(currentProfile).get();
+    if (profileDoc.exists) {
+      populateFields(profileDoc.data());
+      // also update localStorage backup
+      localStorage.setItem('resumeData_' + currentProfile, JSON.stringify(profileDoc.data()));
+    } else {
+      loadFromStorage();
+    }
+  } catch (e) {
+    loadFromStorage(); // fallback to localStorage if offline
+  }
+  populateProfileSelect();
+  render();
+  const ind = document.getElementById('save-indicator');
+  ind.textContent = 'saved ☁';
+  ind.className = 'save-indicator cloud';
+}
+
+function exportBackup() {
+  const data = buildDataSnapshot();
+  const profiles = getProfiles();
+  const backup = { profiles, activeProfile: currentProfile, data: { [currentProfile]: data } };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const safeName = val('f-name').replace(/\s+/g, '_') || 'Resume';
+  a.download = safeName + '_' + currentProfile.replace(/\s+/g, '_') + '_backup.json';
+  a.click();
+}
 
 // ── ATS SCANNER ───────────────────────────────────────────────────────────────
 const STOP = new Set(['the','and','or','a','an','of','in','to','for','with','on','at','by','from','as','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','shall','can','that','this','these','those','it','its','we','our','you','your','they','their','he','she','his','her','who','which','what','when','where','how','all','any','each','every','both','few','more','most','other','some','such','no','nor','not','only','own','same','so','than','too','very','just','but','also','about','above','after','before','between','into','through','during','including','without','within','along','following','across','behind','beyond','plus','except','up','out','around','if','then','than','about','over','under','its','their','we','i','me','my','us','am','re','ve']);
@@ -621,9 +719,19 @@ ${content}
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 currentProfile = localStorage.getItem('resumeCurrentProfile') || 'Default';
+
+// Load from localStorage immediately so UI isn't blank while Firebase connects
 populateProfileSelect();
 loadFromStorage();
 render();
+
+// Then silently sign in and upgrade to cloud data
+auth.onAuthStateChanged(user => {
+  if (user) loadFromCloud(user.uid);
+});
+auth.signInAnonymously().catch(() => {
+  // Firebase unavailable — localStorage fallback already loaded above
+});
 </script>
 </body>
 </html>
