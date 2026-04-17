@@ -105,6 +105,7 @@ textarea { min-height: 64px; }
 </style>
 </head>
 <body>
+<div id="fb-banner" style="display:none;padding:10px 16px;font-size:12px;font-weight:600;text-align:center;position:sticky;top:0;z-index:999;line-height:1.5;"></div>
 <div class="app">
   <div class="sidebar">
     <!-- Profile bar -->
@@ -758,8 +759,33 @@ populateProfileSelect();
 loadFromStorage();
 render();
 
-// Then load from Firestore (overwrites with latest cloud data)
-loadFromCloud();
+// Test Firebase and show result
+async function testAndLoad() {
+  const banner = document.getElementById('fb-banner');
+  banner.style.display = 'block';
+  banner.style.background = '#fffbeb';
+  banner.style.color = '#744210';
+  banner.textContent = '⏳ Connecting to Firebase…';
+  try {
+    await db.collection('resumes').doc(syncId).collection('profiles').doc('__ping__').set({ ts: Date.now() });
+    banner.style.background = '#e6f4ea';
+    banner.style.color = '#276749';
+    banner.textContent = '✅ Firebase connected — all changes sync across devices automatically';
+    setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    loadFromCloud();
+  } catch(e) {
+    if (e.code === 'permission-denied') {
+      banner.style.background = '#fff5f5';
+      banner.style.color = '#c53030';
+      banner.innerHTML = '🔒 <strong>Firestore rules are blocking saves.</strong> Fix: Firebase Console → Firestore Database → Rules → replace all with: <code style="background:#fce;padding:2px 5px;border-radius:3px">allow read, write: if true;</code> → Publish';
+    } else {
+      banner.style.background = '#fff5f5';
+      banner.style.color = '#c53030';
+      banner.textContent = '⚠️ Firebase error: ' + (e.code || e.message);
+    }
+  }
+}
+testAndLoad();
 </script>
 </body>
 </html>
