@@ -781,7 +781,7 @@ async function testAndLoad() {
   banner.style.color = '#744210';
   banner.textContent = '⏳ Connecting to Firebase…';
   try {
-    await db.collection('resumeData').doc('__ping__').set({ ts: Date.now() });
+    await db.collection('resumeData').doc('ping-test').set({ ts: Date.now() });
     banner.style.background = '#e6f4ea';
     banner.style.color = '#276749';
     banner.textContent = '✅ Firebase connected — all changes sync across devices automatically';
