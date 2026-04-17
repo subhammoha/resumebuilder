@@ -200,8 +200,8 @@ textarea { min-height: 64px; }
     </div>
   </div>
 </div>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 const firebaseConfig = {
@@ -357,10 +357,12 @@ async function switchProfile(name) {
   currentProfile = name;
   localStorage.setItem('resumeCurrentProfile', name);
   try {
-    const doc = await db.collection('resumes').doc(syncId).collection('profiles').doc(name).get();
-    if (doc.exists) { populateFields(doc.data()); }
-    else { loadFromStorage(); }
-    await db.collection('resumes').doc(syncId).collection('profiles').doc('__meta__').set({ profiles: getProfiles(), activeProfile: name });
+    const snap = await db.collection('resumeData').doc(syncId).get();
+    if (snap.exists) {
+      const data = (snap.data().profileData || {})[name];
+      if (data) { populateFields(data); }
+      else { loadFromStorage(); }
+    } else { loadFromStorage(); }
   } catch(e) { loadFromStorage(); }
   render();
   const activeTab = document.querySelector('.tab-panel.active');
@@ -442,13 +444,21 @@ async function saveToStorage() {
   const data = buildDataSnapshot();
   localStorage.setItem('resumeData_' + currentProfile, JSON.stringify(data));
   try {
-    const ref = db.collection('resumes').doc(syncId).collection('profiles');
-    await ref.doc(currentProfile).set(data);
-    await ref.doc('__meta__').set({ profiles: getProfiles(), activeProfile: currentProfile });
+    const doc = db.collection('resumeData').doc(syncId);
+    const snap = await doc.get();
+    const existing = snap.exists ? (snap.data().profileData || {}) : {};
+    existing[currentProfile] = data;
+    await doc.set({
+      profiles: getProfiles(),
+      activeProfile: currentProfile,
+      profileData: existing,
+      updatedAt: Date.now()
+    });
     ind.textContent = 'saved ☁';
     ind.className = 'save-indicator cloud';
   } catch (e) {
-    ind.textContent = 'saved locally';
+    console.error('Firestore save error:', e);
+    ind.textContent = 'offline (' + (e.code || e.message) + ')';
     ind.className = 'save-indicator offline';
   }
 }
@@ -500,18 +510,21 @@ function populateFields(d) {
 async function loadFromCloud() {
   const ind = document.getElementById('save-indicator');
   try {
-    const ref = db.collection('resumes').doc(syncId).collection('profiles');
-    const metaDoc = await ref.doc('__meta__').get();
-    if (metaDoc.exists) {
-      const { profiles, activeProfile } = metaDoc.data();
-      setProfiles(profiles);
-      currentProfile = activeProfile || profiles[0];
-      localStorage.setItem('resumeCurrentProfile', currentProfile);
-    }
-    const profileDoc = await ref.doc(currentProfile).get();
-    if (profileDoc.exists) {
-      populateFields(profileDoc.data());
-      localStorage.setItem('resumeData_' + currentProfile, JSON.stringify(profileDoc.data()));
+    const snap = await db.collection('resumeData').doc(syncId).get();
+    if (snap.exists) {
+      const { profiles, activeProfile, profileData } = snap.data();
+      if (profiles) setProfiles(profiles);
+      if (activeProfile) {
+        currentProfile = activeProfile;
+        localStorage.setItem('resumeCurrentProfile', currentProfile);
+      }
+      const data = profileData && profileData[currentProfile];
+      if (data) {
+        populateFields(data);
+        localStorage.setItem('resumeData_' + currentProfile, JSON.stringify(data));
+      } else {
+        loadFromStorage();
+      }
       ind.textContent = 'saved ☁';
       ind.className = 'save-indicator cloud';
     } else {
@@ -520,8 +533,9 @@ async function loadFromCloud() {
       ind.className = 'save-indicator saved';
     }
   } catch (e) {
+    console.error('Firestore load error:', e);
     loadFromStorage();
-    ind.textContent = 'offline';
+    ind.textContent = 'offline (' + (e.code || e.message) + ')';
     ind.className = 'save-indicator offline';
   }
   populateProfileSelect();
@@ -767,21 +781,20 @@ async function testAndLoad() {
   banner.style.color = '#744210';
   banner.textContent = '⏳ Connecting to Firebase…';
   try {
-    await db.collection('resumes').doc(syncId).collection('profiles').doc('__ping__').set({ ts: Date.now() });
+    await db.collection('resumeData').doc('__ping__').set({ ts: Date.now() });
     banner.style.background = '#e6f4ea';
     banner.style.color = '#276749';
     banner.textContent = '✅ Firebase connected — all changes sync across devices automatically';
     setTimeout(() => { banner.style.display = 'none'; }, 4000);
     loadFromCloud();
   } catch(e) {
+    console.error('Firebase test error:', e);
+    banner.style.background = '#fff5f5';
+    banner.style.color = '#c53030';
     if (e.code === 'permission-denied') {
-      banner.style.background = '#fff5f5';
-      banner.style.color = '#c53030';
-      banner.innerHTML = '🔒 <strong>Firestore rules are blocking saves.</strong> Fix: Firebase Console → Firestore Database → Rules → replace all with: <code style="background:#fce;padding:2px 5px;border-radius:3px">allow read, write: if true;</code> → Publish';
+      banner.innerHTML = '🔒 <strong>Firestore rules blocking.</strong> Firebase Console → Firestore → Rules → set <code style="background:#fce;padding:2px 4px">allow read, write: if true;</code> → Publish';
     } else {
-      banner.style.background = '#fff5f5';
-      banner.style.color = '#c53030';
-      banner.textContent = '⚠️ Firebase error: ' + (e.code || e.message);
+      banner.textContent = '⚠️ Firebase error [' + (e.code || 'unknown') + ']: ' + e.message;
     }
   }
 }
