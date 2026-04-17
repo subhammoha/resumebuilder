@@ -181,7 +181,7 @@ textarea { min-height: 64px; }
     <div class="sync-bar">
       <div class="sync-bar-title">Sync code — use on any device to access this resume</div>
       <div class="sync-bar-row">
-        <span class="sync-code-display" id="sync-code-display"></span>
+        <span class="sync-code-display" id="sync-code-display" title="Your sync URL — copy the page URL and open on any device or browser"></span>
         <button class="btn-sync" onclick="copySyncCode()">Copy</button>
         <button class="btn-sync" onclick="enterSyncCode()">Use code</button>
       </div>
@@ -221,8 +221,15 @@ function generateUUID() {
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
 }
-let syncId = localStorage.getItem('resume_syncId');
-if (!syncId) { syncId = generateUUID(); localStorage.setItem('resume_syncId', syncId); }
+const _urlParams = new URLSearchParams(window.location.search);
+let syncId = _urlParams.get('sync') || localStorage.getItem('resume_syncId');
+if (!syncId) { syncId = generateUUID(); }
+localStorage.setItem('resume_syncId', syncId);
+if (!_urlParams.get('sync')) {
+  const _syncUrl = new URL(window.location.href);
+  _syncUrl.searchParams.set('sync', syncId);
+  history.replaceState(null, '', _syncUrl.toString());
+}
 
 // ── DEFAULT DATA ──────────────────────────────────────────────────────────────
 const DEFAULTS = {
@@ -445,15 +452,14 @@ async function saveToStorage() {
   localStorage.setItem('resumeData_' + currentProfile, JSON.stringify(data));
   try {
     const doc = db.collection('resumeData').doc(syncId);
-    const snap = await doc.get();
-    const existing = snap.exists ? (snap.data().profileData || {}) : {};
-    existing[currentProfile] = data;
-    await doc.set({
-      profiles: getProfiles(),
-      activeProfile: currentProfile,
-      profileData: existing,
-      updatedAt: Date.now()
-    });
+    const upd = { profiles: getProfiles(), activeProfile: currentProfile, updatedAt: Date.now() };
+    upd[`profileData.${currentProfile}`] = data;
+    try {
+      await doc.update(upd);
+    } catch(_) {
+      await doc.set({ profiles: getProfiles(), activeProfile: currentProfile,
+        profileData: { [currentProfile]: data }, updatedAt: Date.now() });
+    }
     ind.textContent = 'saved ☁';
     ind.className = 'save-indicator cloud';
   } catch (e) {
@@ -784,7 +790,7 @@ async function testAndLoad() {
     await db.collection('resumeData').doc('ping-test').set({ ts: Date.now() });
     banner.style.background = '#e6f4ea';
     banner.style.color = '#276749';
-    banner.textContent = '✅ Firebase connected — all changes sync across devices automatically';
+    banner.textContent = '✅ Cloud sync active — bookmark this URL or copy it to open on any device';
     setTimeout(() => { banner.style.display = 'none'; }, 4000);
     loadFromCloud();
   } catch(e) {
