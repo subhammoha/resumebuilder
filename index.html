@@ -41,6 +41,12 @@ textarea { min-height: 64px; }
 .btn-add:hover { background: #f0f4f8; border-color: #1a3a5c; color: #1a3a5c; }
 .btn-export { width: 100%; padding: 11px; background: #1a3a5c; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 1rem; letter-spacing: 0.02em; }
 .btn-export:hover { background: #0f2640; }
+.sync-bar { margin-top: 0.75rem; padding: 8px 10px; background: #f0f4f8; border: 1px solid #e2e8f0; border-radius: 6px; }
+.sync-bar-title { font-size: 9px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
+.sync-bar-row { display: flex; gap: 5px; align-items: center; }
+.sync-code-display { flex: 1; font-size: 11px; font-family: monospace; color: #1a3a5c; background: white; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-sync { font-size: 10px; padding: 4px 8px; border: 1px solid #cbd5e0; border-radius: 4px; background: white; color: #444; cursor: pointer; white-space: nowrap; }
+.btn-sync:hover { background: #eef2f7; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .ats-tip { background: #fffbeb; border: 1px solid #f6e05e; border-radius: 6px; padding: 8px 10px; font-size: 10.5px; color: #744210; margin-bottom: 12px; line-height: 1.5; }
@@ -171,6 +177,14 @@ textarea { min-height: 64px; }
       <div id="ats-results"></div>
     </div>
 
+    <div class="sync-bar">
+      <div class="sync-bar-title">Sync code — use on any device to access this resume</div>
+      <div class="sync-bar-row">
+        <span class="sync-code-display" id="sync-code-display"></span>
+        <button class="btn-sync" onclick="copySyncCode()">Copy</button>
+        <button class="btn-sync" onclick="enterSyncCode()">Use code</button>
+      </div>
+    </div>
     <button class="btn-export" onclick="exportPDF()">Print / Save as PDF</button>
     <button class="btn-export" style="margin-top:6px;background:#4a5568;font-size:11px;padding:8px;" onclick="exportBackup()">Export Backup (.json)</button>
   </div>
@@ -186,7 +200,6 @@ textarea { min-height: 64px; }
   </div>
 </div>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
@@ -200,7 +213,15 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const auth = firebase.auth();
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+let syncId = localStorage.getItem('resume_syncId');
+if (!syncId) { syncId = generateUUID(); localStorage.setItem('resume_syncId', syncId); }
 
 // ── DEFAULT DATA ──────────────────────────────────────────────────────────────
 const DEFAULTS = {
@@ -334,17 +355,12 @@ async function switchProfile(name) {
   await saveToStorage();
   currentProfile = name;
   localStorage.setItem('resumeCurrentProfile', name);
-  const user = auth.currentUser;
-  if (user) {
-    try {
-      const doc = await db.collection('resumes').doc(user.uid).collection('profiles').doc(name).get();
-      if (doc.exists) { populateFields(doc.data()); }
-      else { loadFromStorage(); }
-      await db.collection('resumes').doc(user.uid).collection('profiles').doc('__meta__').set({ profiles: getProfiles(), activeProfile: name });
-    } catch(e) { loadFromStorage(); }
-  } else {
-    loadFromStorage();
-  }
+  try {
+    const doc = await db.collection('resumes').doc(syncId).collection('profiles').doc(name).get();
+    if (doc.exists) { populateFields(doc.data()); }
+    else { loadFromStorage(); }
+    await db.collection('resumes').doc(syncId).collection('profiles').doc('__meta__').set({ profiles: getProfiles(), activeProfile: name });
+  } catch(e) { loadFromStorage(); }
   render();
   const activeTab = document.querySelector('.tab-panel.active');
   if (activeTab && activeTab.id === 'tab-experience') renderExpList();
@@ -423,23 +439,16 @@ function buildDataSnapshot() {
 async function saveToStorage() {
   const ind = document.getElementById('save-indicator');
   const data = buildDataSnapshot();
-  // Always write localStorage as backup
   localStorage.setItem('resumeData_' + currentProfile, JSON.stringify(data));
-  const user = auth.currentUser;
-  if (user) {
-    try {
-      const ref = db.collection('resumes').doc(user.uid).collection('profiles');
-      await ref.doc(currentProfile).set(data);
-      await ref.doc('__meta__').set({ profiles: getProfiles(), activeProfile: currentProfile });
-      ind.textContent = 'saved ☁';
-      ind.className = 'save-indicator cloud';
-    } catch (e) {
-      ind.textContent = 'saved locally';
-      ind.className = 'save-indicator offline';
-    }
-  } else {
-    ind.textContent = 'saved';
-    ind.className = 'save-indicator saved';
+  try {
+    const ref = db.collection('resumes').doc(syncId).collection('profiles');
+    await ref.doc(currentProfile).set(data);
+    await ref.doc('__meta__').set({ profiles: getProfiles(), activeProfile: currentProfile });
+    ind.textContent = 'saved ☁';
+    ind.className = 'save-indicator cloud';
+  } catch (e) {
+    ind.textContent = 'saved locally';
+    ind.className = 'save-indicator offline';
   }
 }
 
@@ -487,9 +496,10 @@ function populateFields(d) {
   JSON.parse(d.expData || '[]').forEach(e => expData.push(e));
 }
 
-async function loadFromCloud(uid) {
+async function loadFromCloud() {
+  const ind = document.getElementById('save-indicator');
   try {
-    const ref = db.collection('resumes').doc(uid).collection('profiles');
+    const ref = db.collection('resumes').doc(syncId).collection('profiles');
     const metaDoc = await ref.doc('__meta__').get();
     if (metaDoc.exists) {
       const { profiles, activeProfile } = metaDoc.data();
@@ -500,19 +510,41 @@ async function loadFromCloud(uid) {
     const profileDoc = await ref.doc(currentProfile).get();
     if (profileDoc.exists) {
       populateFields(profileDoc.data());
-      // also update localStorage backup
       localStorage.setItem('resumeData_' + currentProfile, JSON.stringify(profileDoc.data()));
+      ind.textContent = 'saved ☁';
+      ind.className = 'save-indicator cloud';
     } else {
       loadFromStorage();
+      ind.textContent = 'saved';
+      ind.className = 'save-indicator saved';
     }
   } catch (e) {
-    loadFromStorage(); // fallback to localStorage if offline
+    loadFromStorage();
+    ind.textContent = 'offline';
+    ind.className = 'save-indicator offline';
   }
   populateProfileSelect();
   render();
-  const ind = document.getElementById('save-indicator');
-  ind.textContent = 'saved ☁';
-  ind.className = 'save-indicator cloud';
+}
+
+function copySyncCode() {
+  navigator.clipboard.writeText(syncId).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+
+function enterSyncCode() {
+  const code = prompt('Enter sync code from another device:');
+  if (!code || !code.trim()) return;
+  const trimmed = code.trim();
+  if (trimmed === syncId) { alert('That is already your current sync code.'); return; }
+  if (!confirm('Switch to sync code "' + trimmed.substring(0, 8) + '…"? Your current data on this device will be replaced with data from that code.')) return;
+  syncId = trimmed;
+  localStorage.setItem('resume_syncId', syncId);
+  document.getElementById('sync-code-display').textContent = syncId.substring(0, 8) + '…';
+  loadFromCloud();
 }
 
 function exportBackup() {
@@ -719,19 +751,15 @@ ${content}
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 currentProfile = localStorage.getItem('resumeCurrentProfile') || 'Default';
+document.getElementById('sync-code-display').textContent = syncId.substring(0, 8) + '…';
 
-// Load from localStorage immediately so UI isn't blank while Firebase connects
+// Show localStorage immediately so UI isn't blank while Firestore loads
 populateProfileSelect();
 loadFromStorage();
 render();
 
-// Then silently sign in and upgrade to cloud data
-auth.onAuthStateChanged(user => {
-  if (user) loadFromCloud(user.uid);
-});
-auth.signInAnonymously().catch(() => {
-  // Firebase unavailable — localStorage fallback already loaded above
-});
+// Then load from Firestore (overwrites with latest cloud data)
+loadFromCloud();
 </script>
 </body>
 </html>
